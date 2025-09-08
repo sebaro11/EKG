@@ -36,7 +36,7 @@ on:
         options:
           - --key
           - --small-business-key
-        default: --small-business-key
+        default: --key
       os:
         description: 'Operating System of runner (Linux, macOS, Windows)'
         required: true
@@ -78,16 +78,16 @@ jobs:
           fi
 
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Clone Repository
-        run: git clone -b "${{ steps.vars.outputs.branch }}" https://github.com/rzc0d3r/ESET-KeyGen.git
+        run: git clone -b "${{ steps.vars.outputs.branch }}" https://github.com/shadowcopyrz/etkg.git
 
       - name: Setup & Run Script (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          cd ESET-KeyGen
+          cd etkg
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             brew install python@3.11 || true
           else
@@ -120,7 +120,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cd ESET-KeyGen
+          cd etkg
           python -m venv venv
           .\venv\Scripts\pip install -r requirements.txt
           .\venv\Scripts\Activate.ps1
