@@ -36,7 +36,7 @@ on:
         options:
           - --key
           - --small-business-key
-        default: --key
+        default: --small-business-key
       os:
         description: 'Operating System of runner (Linux, macOS, Windows)'
         required: true
@@ -45,7 +45,7 @@ on:
           - ubuntu-latest
           - macos-latest
           - windows-latest
-        default: windows-latest
+        default: ubuntu-latest
       branch:
         description: "Repository branch (don't touch it if you don't know what it is!!!)"
         required: false
