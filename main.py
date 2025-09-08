@@ -2,6 +2,7 @@ import contextlib
 import logging
 import pathlib
 import json
+import copy
 import sys
 import io
 
@@ -26,7 +27,7 @@ if ('--disable-logging' not in sys.argv and not MBCI_MODE) or ('--disable-loggin
 from modules.EmailAPIs import *
 
 # ---- Quick settings [for Developers to quickly change behavior without changing all files] ----
-VERSION = ['v1.5.5.8', 1558]
+VERSION = ['v1.5.6.1', 1561]
 LOGO = f"""
 ███████╗███████╗███████╗████████╗   ██╗  ██╗███████╗██╗   ██╗ ██████╗ ███████╗███╗   ██╗
 ██╔════╝██╔════╝██╔════╝╚══██╔══╝   ██║ ██╔╝██╔════╝╚██╗ ██╔╝██╔════╝ ██╔════╝████╗  ██║
@@ -39,7 +40,9 @@ LOGO = f"""
                                                               Fasjeit, alejanpa17, Ischunddu,
                                                               soladify, AngryBonk, Xoncia,
                                                               Anteneh13, otre4, AHDR3,
-                                                              Shariful797
+                                                              Shariful797, ImHisako,
+                                                              ppsmurf
+                                                Telegram: https://t.me/rzc0d3r_official
 """
 if '--no-logo' in sys.argv:
     LOGO = f"ESET KeyGen {VERSION[0]} by rzc0d3r\n"
@@ -63,6 +66,7 @@ args = {
     'auto_detect_browser': True,
     'chrome': False,
     'firefox': False,
+    'waterfox': False,
     'edge': False,
     'safari': False,
 
@@ -87,6 +91,7 @@ args = {
     'no_logo': False,
     'disable_progress_bar': False,
     'disable_output_file': False,
+    'output_file': '',
     'repeat': 1,
     'proxy_file': DEFAULT_PATH_TO_PROXY_FILE,
     
@@ -94,14 +99,14 @@ args = {
     'disable_logging': False
 }
 
-MBCI_BROWSERS_ARGS = ['auto-detect-browser', 'chrome', 'firefox', 'edge', 'safari']
+MBCI_BROWSERS_ARGS = ['auto-detect-browser', 'chrome', 'firefox', 'waterfox', 'edge', 'safari']
 MBCI_MODES_OF_OPERATION_ARGS = [
     'key', 'small-business-key', 'advanced-key', 'vpn-codes', 'account',
     'protecthub-account', 'only-webdriver-update', 'reset-eset-vpn', 'update', 'install'
 ]
 MBCI_OTHER_ARGS = [
     'skip_webdriver_menu', 'no_headless', 'custom_browser_location', 'custom_email_api',
-    'skip_update_check', 'disable_progress_bar', 'disable_output_file', 'repeat', 'disable_logging',
+    'skip_update_check', 'disable_progress_bar', 'disable_output_file', 'output_file', 'repeat', 'disable_logging',
     'proxy_file'
 ]
 MBCI_ARGS = MBCI_BROWSERS_ARGS + MBCI_MODES_OF_OPERATION_ARGS + MBCI_OTHER_ARGS
@@ -134,11 +139,14 @@ import re
 
 PATH_TO_SELF = sys.executable if I_AM_EXECUTABLE else __file__ # importing modules removes the original value of the variable
 DRIVER = None
+ARGS_DEFAULT = copy.deepcopy(args)
+
 PROXIES = []
 PROXIES_LEN = 0
 PROXY_COUNTER = 1
 PROXY_ERROR_COUNTER = 0
 PROXY_ERROR_COUNTER_LIMIT = 3
+
 CHROME_PROXY_EXTENSION_PATH = ""
 
 class MBCIConfigManager:
@@ -146,24 +154,38 @@ class MBCIConfigManager:
         self.path = path
 
     def save(self, args):
-        config = {
-            'Browser': [key for key in MBCI_BROWSERS_ARGS if args[key.replace('-', '_')]][0],
-            'Mode of operation': [key for key in MBCI_MODES_OF_OPERATION_ARGS if args[key.replace('-', '_')]][0],
-            'Email API': args['email_api']
-        }
-        
+        config = {}
+
+        for key in MBCI_BROWSERS_ARGS:
+            key_ = key.replace('-', '_')
+            if ARGS_DEFAULT[key_] != args[key_]:
+                config["Browser"] = key
+
+        for key in MBCI_MODES_OF_OPERATION_ARGS:
+            key_ = key.replace('-', '_')
+            if ARGS_DEFAULT[key_] != args[key_]:
+                config["Mode of operation"] = key
+
+        if DEFAULT_EMAIL_API != args["email_api"]:
+            config["Email API"] = args["email_api"]
+
         for key in MBCI_OTHER_ARGS:
-            config[key] = args[key]
+            if ARGS_DEFAULT[key] != args[key]:
+                config[key] = args[key]
         
-        json.dump(config, open(CONFIG_PATH, 'w'), indent=4)
+        if config != {}:
+            json.dump(config, open(CONFIG_PATH, 'w'), indent=4)
+            return True
+
+        return False
     
-    def load(self):
+    def load(self, convert_to_sys_argv = False):
         config = json.load(open(self.path))
+        filtered_config = {}
         try:
-            filtered_config = {}
-            browser = config.pop('Browser')
-            mode_of_operation = config.pop('Mode of operation')
-            email_api = config.pop('Email API')
+            browser = config.pop('Browser', "")
+            mode_of_operation = config.pop('Mode of operation', "")
+            email_api = config.pop('Email API', "")
             if browser in MBCI_BROWSERS_ARGS:
                 filtered_config[browser] = True
             if mode_of_operation in MBCI_MODES_OF_OPERATION_ARGS:
@@ -173,9 +195,36 @@ class MBCIConfigManager:
             for key in config:
                 if key in MBCI_OTHER_ARGS:
                     filtered_config[key] = config[key]
-            return filtered_config
         except:
-            return False
+            pass
+
+        if convert_to_sys_argv and filtered_config != {}:        
+            all_args = copy.deepcopy(ARGS_DEFAULT)
+            browser_in_config = [x for x in filtered_config if x and x in MBCI_BROWSERS_ARGS] != []
+            mode_in_config = [x for x in filtered_config if x and x in MBCI_MODES_OF_OPERATION_ARGS] != []
+            config_sys_argv = []
+
+            if browser_in_config:
+                for key in MBCI_BROWSERS_ARGS:
+                    all_args[key.replace('-', '_')] = False
+
+            if mode_in_config:
+                for key in MBCI_MODES_OF_OPERATION_ARGS:
+                    all_args[key.replace('-', '_')] = False
+            
+            for key, value in filtered_config.items():
+                all_args[key.replace('-', '_')] = value
+
+            for key, value in all_args.items():
+                if (isinstance(value, bool) and not value) or (key in MBCI_OTHER_ARGS and all_args[key] == ARGS_DEFAULT[key]):
+                    continue
+                config_sys_argv.append('--'+key.replace('_', '-'))
+                if not isinstance(value, bool):
+                    config_sys_argv.append(str(value))
+
+            return config_sys_argv
+        else:
+            return filtered_config
     
     @property
     def is_exists(self):
@@ -273,6 +322,15 @@ def RunMenu():
     SettingMenu.add_item(
         OptionAction(
             args,
+            title='--output-file',
+            action='manual_input',
+            args_names='output-file',
+            default_value=args['output_file']
+        )
+    )
+    SettingMenu.add_item(
+        OptionAction(
+            args,
             title='--disable-logging',
             action='bool_switch',
             args_names='disable_logging'
@@ -326,6 +384,7 @@ def parse_argv(sys_argv=None):
         args_browsers = args_parser.add_mutually_exclusive_group(required=ENABLE_REQUIRED_ARGUMENTS)   
         args_browsers.add_argument('--chrome', action='store_true', help='Launching the program via Google Chrome browser')
         args_browsers.add_argument('--firefox', action='store_true', help='Launching the program via Mozilla Firefox browser')
+        args_browsers.add_argument('--waterfox', action='store_true', help='Launching the program via Waterfox browser')
         args_browsers.add_argument('--edge', action='store_true', help='Launching the program via Microsoft Edge browser')
         args_browsers.add_argument('--safari', action='store_true', help='Launching the program via Apple Safari browser')
         args_browsers.add_argument('--auto-detect-browser', action='store_true', help='The program itself will determine which browser to use (from the list of supported browsers)')
@@ -353,6 +412,7 @@ def parse_argv(sys_argv=None):
         args_parser.add_argument('--no-logo', action='store_true', help='Replaces ASCII-Art with plain text')
         args_parser.add_argument('--disable-progress-bar', action='store_true', help='Disables the webdriver download progress bar')
         args_parser.add_argument('--disable-output-file', action='store_true', help='Disables the output txt file generation')
+        args_parser.add_argument('--output-file', type=str, default='', help='Specifies the path to the output file')
         args_parser.add_argument('--repeat', type=int, default=1, help='Specifies how many times to repeat generation')
         args_parser.add_argument('--proxy-file', type=str, default=DEFAULT_PATH_TO_PROXY_FILE, help=f'Specifies the path from where the list of proxies will be read from, default - {DEFAULT_PATH_TO_PROXY_FILE}')
 
@@ -483,6 +543,8 @@ def main(disable_exit=False):
                     CHROME_PROXY_EXTENSION_PATH = ''
             elif args['firefox']:
                 browser_name = MOZILLA_FIREFOX
+            elif args['waterfox']:
+                browser_name = WATERFOX
             elif args['edge']:
                 browser_name = MICROSOFT_EDGE
             elif args['safari']:
@@ -639,8 +701,11 @@ def main(disable_exit=False):
             logging.info(output_line)
             console_log(output_line, silent_mode=SILENT_MODE)
             if not args['disable_output_file']:
-                date = datetime.datetime.now()
-                f = open(f"{str(date.day)}.{str(date.month)}.{str(date.year)} - "+output_filename, 'a')
+                out_file = None if args['output_file'] == '' else args['output_file']
+                if not out_file:
+                    date = datetime.datetime.now()
+                    out_file = f"{str(date.day)}.{str(date.month)}.{str(date.year)} - " + output_filename
+                f = open(out_file, 'a')
                 f.write(output_line)
                 f.close()
             
@@ -683,22 +748,14 @@ if __name__ == '__main__':
         config_manager = MBCIConfigManager()
         if config_manager.is_exists:
             try:
-                config_args = config_manager.load()
-                # converting args(dict) to sys.argv for argparse
-                config_sys_argv = []
-                for key, value in config_args.items():
-                    if isinstance(value, bool) and not value:
-                        continue
-                    config_sys_argv.append('--'+key.replace('_', '-'))
-                    if not isinstance(value, bool):
-                        config_sys_argv.append(str(value))
                 # check config integrity with argparse
+                config_sys_argv = config_manager.load(convert_to_sys_argv=True)
                 parsed_args = parse_argv(config_sys_argv)
                 if parsed_args is not None:
                     args = parsed_args
                 else:
                     raise RuntimeError
-            except:
+            except Exception as E:
                 console_log("\nError loading the config, check its integrity!!!", WARN)
                 input('\nPress Enter to continue...')
         parse_argv() # run MBCI
@@ -751,3 +808,6 @@ if __name__ == '__main__':
                     main(disable_exit=True)
             except KeyboardInterrupt:
                 exit_program(0, DRIVER)
+
+
+
